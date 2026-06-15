@@ -6,6 +6,33 @@
 
 ---
 
+## Ringkasan Metode (Baca Ini Dulu Sebelum Presentasi)
+
+### Metode apa yang dipakai?
+
+Penelitian ini memakai **Support Vector Machine (SVM)** — sebuah algoritma _machine learning_ untuk **klasifikasi**. Tugasnya: memprediksi apakah seorang pasien **mengidap CHD (1)** atau **tidak (0)** berdasarkan 11 data klinis (umur, jenis kelamin, tekanan darah, kolesterol, detak jantung, dll).
+
+Diuji **4 jenis kernel SVM** — Linear, Polynomial, RBF, dan Sigmoid — lalu dibandingkan untuk mencari yang paling akurat.
+
+Untuk menguji performa model, dipakai **2 metode validasi**:
+- **5-Fold Cross Validation** — data dibagi 5, model diuji bergiliran (cepat).
+- **Leave One Out (LOO)** — tiap pasien diuji satu per satu (lebih akurat, lebih lama).
+
+### Kenapa pakai SVM?
+
+| Alasan | Penjelasan |
+|--------|-----------|
+| **Cocok untuk data medis** | SVM terbukti di banyak literatur kedokteran untuk klasifikasi diagnosis penyakit. |
+| **Kuat di data berdimensi tinggi** | Dataset ini punya 11 fitur — SVM tetap stabil meski fiturnya banyak. |
+| **Tahan overfitting** | SVM mencari _margin_ pemisah terlebar antar kelas, sehingga tidak gampang "hafalan" data latih. |
+| **Mengikuti artikel referensi** | Akhtar et al. (2023) memakai SVM untuk kasus yang sama, jadi metode ini bisa kita bandingkan langsung. |
+
+### Kenapa pakai Cross Validation (bukan sekadar split train-test biasa)?
+
+Karena data medis jumlahnya terbatas (918 pasien). Kalau cuma dibagi sekali (mis. 80% latih, 20% uji), hasilnya bisa **kebetulan bagus/jelek** tergantung data mana yang masuk ke bagian uji. Cross validation menguji model berkali-kali pada bagian data yang berbeda, lalu dirata-rata — sehingga hasilnya **lebih objektif dan tidak bias**.
+
+---
+
 ## Daftar Isi
 
 1. [Persiapan](#1-persiapan)
@@ -19,21 +46,50 @@
 
 ## 1. Persiapan
 
-Pastikan semua library sudah terinstall. Jalankan perintah berikut di terminal:
+Pastikan `uv` sudah terinstall. Jika belum:
+> - **Windows:** `pip install uv`
+> - **Mac/Linux:** `pip3 install uv` atau `brew install uv` (jika pakai Homebrew)
+
+Lalu masuk ke folder project terlebih dahulu:
 
 **Windows:**
 ```bash
-uv pip install pandas scikit-learn matplotlib seaborn openpyxl
+cd "C:\Users\Hariz\Downloads\ML TEO"
 ```
 
 **Mac/Linux:**
 ```bash
+cd "/Users/hariz/Desktop/CODE PROJECT/ML TEO"
+```
+
+**Langkah 1 — Buat virtual environment**
+
+`uv pip install` WAJIB punya virtual environment dulu. Buat dengan:
+
+```bash
+uv venv
+```
+
+> Tanpa langkah ini, `uv pip install` akan gagal dengan error:
+> `No virtual environment found; run 'uv venv' to create an environment`
+
+**Kenapa harus pakai virtual environment?**
+
+Virtual environment (`.venv`) adalah folder Python terpisah khusus untuk satu project. Alasannya:
+
+- **Isolasi antar project** — Library yang diinstall (pandas, scikit-learn, dll) cuma masuk ke folder `.venv` project ini, tidak mengotori Python sistem atau project lain. Project A bisa pakai scikit-learn versi 1.9, project B versi 1.0, tanpa bentrok.
+- **Mencegah konflik versi** — Tanpa venv, semua library numpuk jadi satu. Kalau dua project butuh versi berbeda dari library yang sama, salah satu pasti rusak.
+- **Tidak butuh akses admin** — Install ke `.venv` tidak perlu `sudo`/administrator, karena cuma menulis ke folder project sendiri.
+- **Mudah direset** — Kalau ada yang rusak, cukup hapus folder `.venv` lalu `uv venv` lagi — Python sistem tetap aman.
+- **`uv` mewajibkannya** — Makanya `uv pip install` langsung menolak kalau belum ada `.venv` (beda dengan `pip` biasa yang diam-diam install ke sistem dan sering bikin berantakan).
+
+**Langkah 2 — Install library**
+
+```bash
 uv pip install pandas scikit-learn matplotlib seaborn openpyxl
 ```
 
-> Catatan: Command `uv pip install` sama di semua OS. Pastikan `uv` sudah terinstall — jika belum, install dulu dengan:
-> - **Windows:** `pip install uv`
-> - **Mac/Linux:** `pip3 install uv` atau `brew install uv` (jika pakai Homebrew)
+> Catatan: Command di atas sama di semua OS. Jika `.venv` terhapus, ulangi `uv venv` lalu install lagi.
 
 Pastikan struktur folder seperti ini:
 
