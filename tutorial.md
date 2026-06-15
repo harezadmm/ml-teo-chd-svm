@@ -21,9 +21,19 @@
 
 Pastikan semua library sudah terinstall. Jalankan perintah berikut di terminal:
 
+**Windows:**
 ```bash
 uv pip install pandas scikit-learn matplotlib seaborn openpyxl
 ```
+
+**Mac/Linux:**
+```bash
+uv pip install pandas scikit-learn matplotlib seaborn openpyxl
+```
+
+> Catatan: Command `uv pip install` sama di semua OS. Pastikan `uv` sudah terinstall — jika belum, install dulu dengan:
+> - **Windows:** `pip install uv`
+> - **Mac/Linux:** `pip3 install uv` atau `brew install uv` (jika pakai Homebrew)
 
 Pastikan struktur folder seperti ini:
 
