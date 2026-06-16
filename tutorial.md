@@ -14,8 +14,9 @@ Penelitian ini memakai **Support Vector Machine (SVM)** — sebuah algoritma _ma
 
 Diuji **4 jenis kernel SVM** — Linear, Polynomial, RBF, dan Sigmoid — lalu dibandingkan untuk mencari yang paling akurat.
 
-Untuk menguji performa model, dipakai **2 metode validasi**:
-- **5-Fold Cross Validation** — data dibagi 5, model diuji bergiliran (cepat).
+Untuk menguji performa model, dipakai **3 metode validasi**:
+- **Train-Test Split (80/20)** — data dibagi sekali: 80% untuk melatih, 20% untuk menguji (paling sederhana & cepat, sebagai baseline).
+- **5-Fold Cross Validation** — data dibagi 5, model diuji bergiliran (lebih objektif).
 - **Leave One Out (LOO)** — tiap pasien diuji satu per satu (lebih akurat, lebih lama).
 
 ### Kenapa pakai SVM?
@@ -27,9 +28,15 @@ Untuk menguji performa model, dipakai **2 metode validasi**:
 | **Tahan overfitting** | SVM mencari _margin_ pemisah terlebar antar kelas, sehingga tidak gampang "hafalan" data latih. |
 | **Mengikuti artikel referensi** | Akhtar et al. (2023) memakai SVM untuk kasus yang sama, jadi metode ini bisa kita bandingkan langsung. |
 
-### Kenapa pakai Cross Validation (bukan sekadar split train-test biasa)?
+### Kenapa pakai 3 metode (Train-Test Split → CV → LOO)?
 
-Karena data medis jumlahnya terbatas (918 pasien). Kalau cuma dibagi sekali (mis. 80% latih, 20% uji), hasilnya bisa **kebetulan bagus/jelek** tergantung data mana yang masuk ke bagian uji. Cross validation menguji model berkali-kali pada bagian data yang berbeda, lalu dirata-rata — sehingga hasilnya **lebih objektif dan tidak bias**.
+Kita mulai dari yang paling sederhana lalu naik ke yang paling ketat:
+
+- **Train-Test Split (80/20)** adalah baseline standar — bagi data sekali, latih di 80%, uji di 20%. Cepat dan mudah dipahami, tapi hasilnya bisa **kebetulan bagus/jelek** tergantung data mana yang kebetulan masuk ke bagian uji.
+- **Cross Validation** menutup kelemahan itu: model diuji berkali-kali pada bagian data yang berbeda lalu dirata-rata — sehingga **lebih objektif dan tidak bias**.
+- **LOO** adalah bentuk CV paling ketat (tiap pasien jadi data uji satu per satu).
+
+Membandingkan ketiganya membuktikan bahwa hasil model benar-benar stabil, bukan kebetulan. Bukti nyatanya ada di hasil: pada Train-Test Split tunggal, kernel **RBF** terlihat paling unggul, tetapi setelah diuji lewat CV dan LOO, justru **Linear & Sigmoid** yang konsisten terbaik — inilah alasan kenapa satu split saja tidak cukup.
 
 ---
 
@@ -122,7 +129,8 @@ python progress2_svm_chd.py
 
 **Langkah 4 — Tunggu proses selesai**
 
-Proses berjalan dalam 2 tahap:
+Proses berjalan dalam 3 tahap:
+- **Train-Test Split (80/20)** → instan (sekali bagi data)
 - **5-Fold CV** → selesai dalam ~10 detik
 - **Leave One Out CV** → butuh ~3–5 menit (918 iterasi, normal)
 
@@ -134,11 +142,11 @@ Setelah selesai akan muncul 3 jendela grafik secara otomatis.
 
 | File | Isi |
 |------|-----|
-| `hasil_performa_svm.png` | Grafik perbandingan Accuracy, AUC, Sensitivity, Specificity untuk 4 kernel SVM (5-Fold dan LOO) |
+| `hasil_performa_svm.png` | Grafik perbandingan Accuracy, AUC, Sensitivity, Specificity untuk 4 kernel SVM (3 panel: Train-Test Split, 5-Fold, dan LOO) |
 | `heatmap_korelasi.png` | Heatmap korelasi antar fitur dataset |
 | `confusion_matrix_sigmoid.png` | Confusion matrix model terbaik (Sigmoid) |
 
-Di terminal juga akan tercetak **Tabel 2** dan **Tabel 3** berisi nilai numerik lengkap.
+Di terminal juga akan tercetak **Tabel 1**, **Tabel 2**, dan **Tabel 3** berisi nilai numerik lengkap.
 
 ---
 
@@ -188,7 +196,32 @@ Digunakan 4 jenis kernel SVM sesuai artikel referensi:
 
 ---
 
-### Bagian 3 — Uji Coba: 5-Fold Cross Validation
+### Bagian 3 — Uji Coba: Train-Test Split (80/20)
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.20, random_state=42, stratify=y
+)
+```
+
+**Cara kerja Train-Test Split:**
+- Data dibagi **sekali** menjadi dua bagian: 80% untuk **melatih** model dan 20% untuk **menguji**.
+- `stratify=y` menjaga proporsi kelas (CHD vs Tidak CHD) tetap sama di kedua bagian, supaya pembagian adil.
+- `random_state=42` membuat pembagian selalu sama setiap dijalankan (bisa direproduksi).
+
+```
+Total: 918 pasien
+┌──────────────────────────────┬──────────┐
+│      Data Latih (734)        │ Uji(184) │
+│            80%               │   20%    │
+└──────────────────────────────┴──────────┘
+```
+
+Model dilatih pada 734 pasien, lalu diuji pada 184 pasien yang **belum pernah dilihat** model. Ini metode paling sederhana dan jadi titik awal (baseline) sebelum metode validasi yang lebih ketat.
+
+---
+
+### Bagian 4 — Uji Coba: 5-Fold Cross Validation
 
 ```python
 cv5 = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -212,7 +245,7 @@ Iterasi 5: Train=[A,B,C,D]  Test=[E]
 
 ---
 
-### Bagian 4 — Uji Coba: Leave One Out (LOO)
+### Bagian 5 — Uji Coba: Leave One Out (LOO)
 
 ```python
 loo = LeaveOneOut()
@@ -229,7 +262,7 @@ for train_idx, test_idx in loo.split(X_scaled):
 
 ---
 
-### Bagian 5 — Metrik Evaluasi
+### Bagian 6 — Metrik Evaluasi
 
 Dihitung dari **Confusion Matrix**:
 
@@ -253,6 +286,17 @@ Aktual Tidak CHD   TN        FP
 
 ## 5. Penjelasan Hasil
 
+### Tabel 1 — Hasil Train-Test Split (80/20)
+
+| Model | AUC | Accuracy | Sensitivity | Specificity |
+|-------|-----|----------|-------------|-------------|
+| Linear | ~89.1% | ~87.0% | ~93.1% | ~79.3% |
+| Polynomial | ~89.7% | ~88.0% | ~91.2% | ~84.2% |
+| **RBF** | **~92.9%** | **~89.1%** | **~95.1%** | ~81.7% |
+| Sigmoid | ~86.4% | ~80.4% | ~88.2% | ~70.7% |
+
+> Pada split tunggal ini, **RBF** terlihat paling unggul (Accuracy ~89.1%, AUC ~92.9%). Namun hasil ini bergantung pada data uji yang kebetulan terpilih — itulah kenapa kita lanjut ke Cross Validation untuk validasi yang lebih objektif.
+
 ### Tabel 2 — Hasil 5-Fold Cross Validation
 
 | Model | AUC | Accuracy | Sensitivity | Specificity |
@@ -272,9 +316,11 @@ Aktual Tidak CHD   TN        FP
 | **Sigmoid** | ~93.5% | **~87.8%** | **~87.8%** | **~87.4%** |
 
 **Kesimpulan:**
-- Model **Sigmoid** punya Accuracy tertinggi (~87.8%) di LOO → dipilih sebagai model terbaik
-- Model **Linear** punya AUC tertinggi (~93.6%) → paling baik dalam membedakan kelas
-- Metode LOO secara konsisten menghasilkan nilai lebih tinggi dibanding 5-Fold
+- Pada **Train-Test Split**, RBF terlihat unggul — tapi ini hasil dari satu pembagian saja, belum tentu mewakili.
+- Setelah divalidasi lebih ketat (5-Fold & LOO), **Sigmoid** punya Accuracy tertinggi (~87.8% di LOO) → dipilih sebagai model terbaik.
+- Model **Linear** punya AUC tertinggi (~93.6%) → paling baik dalam membedakan kelas.
+- Metode LOO secara konsisten menghasilkan nilai lebih tinggi dibanding 5-Fold.
+- **Pelajaran penting:** model "terbaik" pada satu split (RBF) berbeda dari model terbaik setelah validasi menyeluruh (Sigmoid/Linear) — membuktikan kenapa CV diperlukan.
 
 ---
 
@@ -286,8 +332,9 @@ Aktual Tidak CHD   TN        FP
 ### Jelaskan Metodologi (urut)
 1. Dataset → 918 pasien, 12 fitur klinis
 2. Preprocessing → encoding + normalisasi
-3. Model → SVM 4 kernel (Linear, Poly, RBF, Sigmoid)
-4. Evaluasi → 5-Fold CV + Leave One Out CV
+3. Train-Test Split → bagi data 80% latih / 20% uji
+4. Model → SVM 4 kernel (Linear, Poly, RBF, Sigmoid)
+5. Evaluasi → Train-Test Split + 5-Fold CV + Leave One Out CV
 
 ### Tunjukkan Hasil
 - Tampilkan `hasil_performa_svm.png` → bandingkan 4 kernel
@@ -309,6 +356,9 @@ A: Setiap kernel punya cara berbeda dalam memisahkan data. Kita bandingkan semua
 
 **Q: Kenapa LOO lebih baik dari 5-Fold?**  
 A: LOO menggunakan hampir semua data (n-1 sampel) untuk training di setiap iterasi, sehingga estimasi performanya lebih akurat. Kelemahannya hanya di waktu komputasi yang lebih lama.
+
+**Q: Kenapa pakai Train-Test Split kalau sudah ada Cross Validation?**  
+A: Train-Test Split adalah baseline standar yang paling mudah dipahami dan cepat. Kita pakai sebagai titik awal, lalu naik ke CV dan LOO yang lebih ketat. Membandingkan ketiganya justru menunjukkan kelebihan CV: pada split tunggal RBF terlihat terbaik, tapi setelah validasi menyeluruh ternyata Sigmoid/Linear yang konsisten unggul.
 
 **Q: Apa artinya Sensitivity tinggi?**  
 A: Model jarang "melewatkan" pasien yang benar-benar sakit CHD. Ini sangat penting di dunia medis karena False Negative (pasien sakit tapi diprediksi sehat) bisa berakibat fatal.

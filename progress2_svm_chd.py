@@ -14,7 +14,8 @@ warnings.filterwarnings('ignore')
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
-from sklearn.model_selection import cross_val_score, LeaveOneOut, StratifiedKFold
+from sklearn.model_selection import (cross_val_score, LeaveOneOut, StratifiedKFold,
+                                     train_test_split)
 from sklearn.metrics import (accuracy_score, roc_auc_score, confusion_matrix,
                               classification_report, ConfusionMatrixDisplay)
 from sklearn.pipeline import Pipeline
@@ -69,10 +70,54 @@ kernels = {
 }
 
 # ============================================================
-# BAGIAN 3: UJI COBA - 5-FOLD CROSS VALIDATION
+# BAGIAN 3: UJI COBA - TRAIN-TEST SPLIT (80/20)
 # ============================================================
 print("\n" + "=" * 60)
-print("UJI COBA 1: 5-FOLD CROSS VALIDATION")
+print("UJI COBA 1: TRAIN-TEST SPLIT (80% Latih / 20% Uji)")
+print("=" * 60)
+
+# Bagi data: 80% untuk training, 20% untuk testing.
+# stratify=y menjaga proporsi kelas (CHD / Tidak CHD) tetap sama di kedua bagian.
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.20, random_state=42, stratify=y
+)
+print(f"\n  Data latih : {X_train.shape[0]} pasien (80%)")
+print(f"  Data uji   : {X_test.shape[0]} pasien (20%)")
+
+results_tts = {}
+for name, model in kernels.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    acc = accuracy_score(y_test, y_pred) * 100
+    auc = roc_auc_score(y_test, y_prob) * 100
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+    sens = (tp / (tp + fn)) * 100
+    spec = (tn / (tn + fp)) * 100
+
+    results_tts[name] = {
+        'AUC'        : round(auc, 2),
+        'Accuracy'   : round(acc, 2),
+        'Sensitivity': round(sens, 2),
+        'Specificity': round(spec, 2),
+    }
+    print(f"\n  [{name}]")
+    print(f"    AUC         : {results_tts[name]['AUC']:.2f}%")
+    print(f"    Accuracy    : {results_tts[name]['Accuracy']:.2f}%")
+    print(f"    Sensitivity : {results_tts[name]['Sensitivity']:.2f}%")
+    print(f"    Specificity : {results_tts[name]['Specificity']:.2f}%")
+
+df_tts = pd.DataFrame(results_tts).T
+df_tts.index.name = 'Model'
+print("\nTabel 1. Performa CHD menggunakan SVM Train-Test Split (80/20):")
+print(df_tts.to_string())
+
+# ============================================================
+# BAGIAN 4: UJI COBA - 5-FOLD CROSS VALIDATION
+# ============================================================
+print("\n" + "=" * 60)
+print("UJI COBA 2: 5-FOLD CROSS VALIDATION")
 print("=" * 60)
 
 cv5 = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -112,10 +157,10 @@ print("\nTabel 2. Performa CHD menggunakan SVM 5-Fold:")
 print(df_5fold.to_string())
 
 # ============================================================
-# BAGIAN 4: UJI COBA - LEAVE ONE OUT CROSS VALIDATION
+# BAGIAN 5: UJI COBA - LEAVE ONE OUT CROSS VALIDATION
 # ============================================================
 print("\n" + "=" * 60)
-print("UJI COBA 2: LEAVE ONE OUT CROSS VALIDATION")
+print("UJI COBA 3: LEAVE ONE OUT CROSS VALIDATION")
 print("=" * 60)
 print("(Proses LOO memerlukan waktu lebih lama...)")
 
@@ -165,13 +210,13 @@ print("\nTabel 3. Performa CHD menggunakan SVM Leave One Out:")
 print(df_loo.to_string())
 
 # ============================================================
-# BAGIAN 5: VISUALISASI
+# BAGIAN 6: VISUALISASI
 # ============================================================
 print("\n" + "=" * 60)
 print("VISUALISASI HASIL")
 print("=" * 60)
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+fig, axes = plt.subplots(1, 3, figsize=(20, 5))
 fig.suptitle('Performa SVM untuk Deteksi CHD', fontsize=14, fontweight='bold')
 
 metrics = ['AUC', 'Accuracy', 'Sensitivity', 'Specificity']
@@ -179,8 +224,24 @@ x = np.arange(len(metrics))
 width = 0.2
 colors = ['#2196F3', '#4CAF50', '#FF9800', '#E91E63']
 
+# Plot Train-Test Split
+ax0 = axes[0]
+for i, (name, vals) in enumerate(results_tts.items()):
+    vals_list = [vals[m] for m in metrics]
+    bars = ax0.bar(x + i * width, vals_list, width, label=name, color=colors[i], alpha=0.85)
+    for bar, v in zip(bars, vals_list):
+        ax0.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                 f'{v:.1f}', ha='center', va='bottom', fontsize=7)
+ax0.set_title('Train-Test Split (80/20)')
+ax0.set_xticks(x + width * 1.5)
+ax0.set_xticklabels(metrics)
+ax0.set_ylabel('Persentase (%)')
+ax0.set_ylim(70, 105)
+ax0.legend(fontsize=8)
+ax0.grid(axis='y', alpha=0.3)
+
 # Plot 5-Fold
-ax1 = axes[0]
+ax1 = axes[1]
 for i, (name, vals) in enumerate(results_5fold.items()):
     vals_list = [vals[m] for m in metrics]
     bars = ax1.bar(x + i * width, vals_list, width, label=name, color=colors[i], alpha=0.85)
@@ -196,7 +257,7 @@ ax1.legend(fontsize=8)
 ax1.grid(axis='y', alpha=0.3)
 
 # Plot LOO
-ax2 = axes[1]
+ax2 = axes[2]
 for i, (name, vals) in enumerate(results_loo.items()):
     vals_list = [vals[m] for m in metrics]
     bars = ax2.bar(x + i * width, vals_list, width, label=name, color=colors[i], alpha=0.85)
@@ -246,14 +307,18 @@ print("  Confusion matrix disimpan: confusion_matrix_sigmoid.png")
 print("\n" + "=" * 60)
 print("RINGKASAN HASIL")
 print("=" * 60)
+print("\nTabel 1 - Train-Test Split (80/20):")
+print(df_tts.to_string())
 print("\nTabel 2 - 5-Fold Cross Validation:")
 print(df_5fold.to_string())
 print("\nTabel 3 - Leave One Out CV:")
 print(df_loo.to_string())
 
+best_tts   = df_tts['Accuracy'].idxmax()
 best_5fold = df_5fold['Accuracy'].idxmax()
 best_loo   = df_loo['Accuracy'].idxmax()
-print(f"\nModel terbaik (5-Fold)       : {best_5fold} - Accuracy {df_5fold.loc[best_5fold,'Accuracy']:.2f}%")
+print(f"\nModel terbaik (Train-Test)   : {best_tts} - Accuracy {df_tts.loc[best_tts,'Accuracy']:.2f}%")
+print(f"Model terbaik (5-Fold)       : {best_5fold} - Accuracy {df_5fold.loc[best_5fold,'Accuracy']:.2f}%")
 print(f"Model terbaik (Leave One Out): {best_loo}   - Accuracy {df_loo.loc[best_loo,'Accuracy']:.2f}%")
 print("\nSelesai! Semua file output telah disimpan.")
 plt.show()
