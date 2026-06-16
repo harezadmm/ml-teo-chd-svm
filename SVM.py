@@ -14,57 +14,46 @@ warnings.filterwarnings('ignore')
 # Buat folder hasil
 os.makedirs('hasil', exist_ok=True)
 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
-from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 
 # ============================================================
-# BAGIAN 1: PREPROCESSING & FEATURE SELECTION
+# BAGIAN 1: PREPROCESSING
 # ============================================================
 print("=" * 60)
-print("1. PREPROCESSING & SUBSET EVALUATOR")
+print("1. PREPROCESSING")
 print("=" * 60)
 
 # 1.1 Load Dataset
-df = pd.read_csv('heart.csv') # Pastikan file dataset sesuai
+df = pd.read_csv('heart.csv')
 print(f"[+] Dataset Dimuat: {df.shape[0]} pasien, {df.shape[1]-1} fitur input.")
 
-# 1.2 Encoding Kategorikal (One-Hot Encoding menggantikan Label Encoding)
-# Hal ini krusial untuk SVM agar tidak ada asumsi hierarki pada data kategorikal
+# 1.2 Label Encoding (sesuai artikel)
 cat_cols = ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
-df_encoded = pd.get_dummies(df, columns=cat_cols, drop_first=True)
+le = LabelEncoder()
+df_encoded = df.copy()
+for col in cat_cols:
+    df_encoded[col] = le.fit_transform(df_encoded[col])
+print(f"[+] Label Encoding diterapkan pada: {cat_cols}")
 
 X = df_encoded.drop('HeartDisease', axis=1)
 y = df_encoded['HeartDisease']
 
 # 1.3 Normalisasi Data (StandardScaler)
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-# 1.4 Subset Evaluator (Seleksi Fitur)
-# Mensimulasikan teknik reduksi fitur berbasis domain/statistik seperti di jurnal
-# Memilih subset fitur terbaik (misal: 10 fitur terpenting) untuk mengurangi noise
-selector = SelectKBest(score_func=f_classif, k=10)
-X_selected = selector.fit_transform(X_scaled, y)
-
-selected_features = X.columns[selector.get_support()]
-print(f"[+] Fitur Terpilih (Subset Evaluator): \n    {list(selected_features)}")
+X_selected = scaler.fit_transform(X)
+print(f"[+] Normalisasi StandardScaler diterapkan. Jumlah fitur: {X.shape[1]}")
 
 # ============================================================
-# BAGIAN 2: KONFIGURASI MODEL V-SVM
+# BAGIAN 2: KONFIGURASI MODEL SVM (parameter default sesuai artikel)
 # ============================================================
-# Tuning parameter (C, gamma, coef0) diatur sedemikian rupa untuk 
-# mendorong performa kernel Linear dan Sigmoid agar mereplika temuan jurnal.
 kernels = {
-    'Linear'    : SVC(kernel='linear', C=0.5, probability=True, random_state=42),
-    'Polynomial': SVC(kernel='poly', degree=3, C=1.0, probability=True, random_state=42),
-    'RBF'       : SVC(kernel='rbf', C=1.0, gamma='scale', probability=True, random_state=42),
-    
-    # Kernel Sigmoid seringkali butuh parameter tuning ekstra (gamma & coef0) 
-    # agar tidak underfitting dan bisa mencapai akurasi tertinggi di LOO
-    'Sigmoid'   : SVC(kernel='sigmoid', C=0.8, gamma='auto', coef0=0.0, probability=True, random_state=42)
+    'Linear'    : SVC(kernel='linear',  probability=True, random_state=42),
+    'Polynomial': SVC(kernel='poly',    probability=True, random_state=42, degree=3),
+    'RBF'       : SVC(kernel='rbf',     probability=True, random_state=42),
+    'Sigmoid'   : SVC(kernel='sigmoid', probability=True, random_state=42),
 }
 
 # ============================================================
